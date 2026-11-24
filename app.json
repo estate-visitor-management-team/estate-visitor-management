@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Estate Visitor Management",
+    "slug": "estate-visitor-management",
+    "scheme": "estatevisitor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Estate Visitor Management to scan visitor QR codes."
+        }
+      ],
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.example.estatevisitormanagement",
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

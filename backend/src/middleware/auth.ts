@@ -1,0 +1,98 @@
+
+import {
+  Request,
+  Response,
+  NextFunction,
+} from 'express';
+
+import {
+  verifyAccess,
+  Claims,
+} from '../security';
+
+import { pool } from '../db';
+
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: Claims;
+    }
+  }
+}
+
+export async function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const authorization = req.header('authorization');
+
+  if (!authorization?.startsWith('Bearer ')) {
+    return res.status(401).json({
+      error: 'Authentication required',
+    });
+  }
+
+  let claims: Claims;
+
+  try {
+    claims = verifyAccess(authorization.slice(7));
+  } catch {
+    return res.status(401).json({
+      error: 'Session expired or invalid',
+    });
+  }
+
+  try {
+    const session = await pool.query(
+      `
+        SELECT rs.id
+        FROM refresh_sessions rs
+        INNER JOIN users u
+          ON u.id = rs.user_id
+        WHERE rs.id = $1
+          AND rs.user_id = $2
+          AND rs.revoked_at IS NULL
+          AND rs.expires_at > NOW()
+          AND u.active = TRUE
+          AND u.estate_id = $3
+          AND u.role = $4
+        LIMIT 1
+      `,
+      [
+        claims.sid,
+        claims.sub,
+        claims.estateId,
+        claims.role,
+      ],
+    );
+
+    if (session.rowCount === 0) {
+      return res.status(401).json({
+        error: 'Session has expired or been revoked',
+      });
+    }
+
+    req.auth = claims;
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export function allow(...roles: Claims['role'][]) {
+  return (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    if (!req.auth || !roles.includes(req.auth.role)) {
+      return res.status(403).json({
+        error: 'Insufficient permission',
+      });
+    }
+
+    return next();
+  };
+}
